@@ -5,9 +5,6 @@ inputs:
   service-name:
     description: The name of service, used for the release name and ECR Repository
     required: true
-  service-type:
-    description: The type of service; api or consumer
-    required: true
   dotnet-type:
     description: The dotnet environment variable required in the Dockerfile; aspnet or dotnet
     required: true
@@ -104,7 +101,7 @@ runs:
           echo "dotnet-environment-type=env.base.DOTNET_ENVIRONMENT" >> $GITHUB_OUTPUT
           ;;
         *)
-          echo "Unsupported service type. Set 'service-type' to either 'api' or 'consumer'."
+          echo "Unsupported service type. Set 'dotnet-type' to either 'aspnet' or 'dotnet'."
           exit 1
           ;;
         esac
