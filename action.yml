@@ -96,7 +96,7 @@ runs:
           echo "branch-endpoint-addon=''" >> $GITHUB_OUTPUT
         else
           echo "release=$(echo ${{ inputs.service-name }}-${{ steps.extract_branch.outputs.clean-branch }})" >> $GITHUB_OUTPUT
-          echo "ecr-repo=$(echo ${{ inputs.service-name }}/${{ steps.etract_branch.outputs.clean-branch }})" >> $GITHUB_OUTPUT
+          echo "ecr-repo=$(echo ${{ inputs.service-name }}/${{ steps.extract_branch.outputs.clean-branch }})" >> $GITHUB_OUTPUT
           echo "branch-endpoint-addon=-${{ steps.extract_branch.outputs.branch }}" >> $GITHUB_OUTPUT
         fi
         
