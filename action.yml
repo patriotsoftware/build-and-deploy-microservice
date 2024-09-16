@@ -213,7 +213,7 @@ runs:
       shell: bash
       run: |
         if [[ ${{ inputs.k6-load-script-path }} != '' ]]; then
-          k6-test-action.sh
+          ${{ github.action_path }}/k6-test-action.sh
         fi
 
     - id: k6-performance-tests
@@ -225,5 +225,5 @@ runs:
       shell: bash
       run: |
         if [[ ${{ inputs.k6-performance-script-path }} != '' ]]; then
-          k6-test-action.sh
+          ${{ github.action_path }}/k6-test-action.sh
         fi
