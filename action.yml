@@ -1,0 +1,217 @@
+name: Deploy Microservice
+description: Build and deploy a microservice to Kubernetes
+
+inputs:
+  service-name:
+    description: The name of service, used for the release name and ECR Repository
+    required: true
+  service-type:
+    description: The type of service; api or consumer
+    required: true
+  dotnet-type:
+    description: The dotnet environment variable required in the Dockerfile; aspnet or dotnet
+    required: true
+  environment: 
+    description: The deployment environment; development, staging, or production
+    required: true
+  aws-access-key-id:
+    description: The AWS access key ID
+    required: true
+  aws-secret-access-key:
+    description: The AWS secret access key
+    required: true
+  dockerfile-path:
+    description: The path to the Dockerfile for the microservice to be built and pushed
+    required: false
+  dockerfile-context:
+    description: The context for the Dockerfile being built
+    required: false
+    default: .
+  dockerfile-extra-args:
+    description: Any extra arguments to be run with the 'docker build' command
+    required: false
+    default: ""
+  helm-additional-args:
+    description: Any extra arguments for the Helm install. Default; "--atomic --timeout 10m" (set to an empty string to override)
+    required: false
+    default: "--atomic --timeout 10m"
+  k6-load-script-path:
+    description: Location of the load test script to run with k6. Leave this empty to disable K6 tests
+    required: false
+  k6-performance-script-path:
+    description: Location of the performance test script to run with k6. Leave this empty to disable K6 tests
+    required: false
+  k6-load-flags:
+    description: Additional flags to pass to the K6 command
+    required: false
+  k6-performance-flags:
+    description: Additional flags to pass to the K6 command
+    required: false
+  k6-load-additional-mount:
+    description: Additional mount point (directory) utilized by the K6 script
+    required: false
+  k6-performance-additional-mount:
+    description: Additional mount point (directory) utilized by the K6 script
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Extract branch name
+      id: extract_branch
+      shell: bash
+      run: |
+        export UNESCAPED_BRANCH_NAME=${GITHUB_REF#refs/heads/}
+        echo "branch=$(echo ${UNESCAPED_BRANCH_NAME})" >> $GITHUB_OUTPUT
+        echo "clean-branch=$(echo ${UNESCAPED_BRANCH_NAME} | sed 's/_//g' | tr '[:upper:]' '[:lower:]' | cut -c -38)" >> $GITHUB_OUTPUT
+
+    # NuGet config built expected in runner image
+    - name: Copy NuGet Config
+      shell: bash
+      run: cp /home/runner/.nuget/NuGet/NuGet.Config ./nuget.config
+
+    - name: Authenticate with AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        # aws-access-key-id: ${{ secrets.DEV_AWS_ACCESS_KEY_ID }}
+        # aws-secret-access-key: ${{ secrets.DEV_AWS_SECRET_ACCESS_KEY }}
+        aws-access-key-id: ${{ inputs.aws-access-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-region: us-east-1
+
+    - name: Environment Setup
+      id: environment-setup
+      shell: bash
+      run: |
+        # Set AWS Account ID
+        echo "account-id=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
+
+        # Set the Release name and ECR Repo name
+        if [[ "${{ steps.extract_branch.outputs.branch }}" =~ (main|master) ]]; then
+          echo "release=${{ service-name }}" >> $GITHUB_OUTPUT
+          echo "ecr-repo=${{ service-name }}" >> $GITHUB_OUTPUT
+        else
+          echo "release=$(echo ${{ service-name }}-${{ steps.extract_branch.outputs.clean-branch }})" >> $GITHUB_OUTPUT
+          echo "ecr-repo=$(echo ${{ service-name }}/${{ steps.extract_branch.outputs.clean-branch }})" >> $GITHUB_OUTPUT
+        fi
+        
+        # Set the service type for dotnet
+        case ${{ inputs.dotnet-type }} in
+        aspnet)
+          echo "dotnet-environment-type=env.base.ASPNETCORE_ENVIRONMENT" >> $GITHUB_OUTPUT
+          ;;
+        dotnet)
+          echo "dotnet-environment-type=env.base.DOTNET_ENVIRONMENT" >> $GITHUB_OUTPUT
+          ;;
+        *)
+          echo "Unsupported service type. Set 'service-type' to either 'api' or 'consumer'."
+          exit 1
+          ;;
+        esac
+
+        case ${{ inputs.environment }} in
+        dev)
+          echo "environment=Development" >> $GITHUB_OUTPUT
+          echo "account-name=psidev" >> $GITHUB_OUTPUT
+          ;;
+        staging)
+          echo "environment=Staging" >> $GITHUB_OUTPUT
+          echo "account-name=psistaging" >> $GITHUB_OUTPUT
+          ;;
+        prod)
+          echo "environment=Production" >> $GITHUB_OUTPUT
+          echo "account-name=psiprod" >> $GITHUB_OUTPUT
+          ;;
+        *)
+          echo -n "Unsupported Account, available options; dev, staging, prod, dba"
+          ;;
+        esac
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Create ECR Repository
+      shell: bash
+      run: aws ecr create-repository --repository-name ${{ steps.environment-setup.outputs.ecr-repo }} || echo "Repository exists already. Skipping creation."
+
+    - name: Set up Docker Buildx
+      id: buildx
+      with:
+        driver: docker
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and Push
+      uses: docker/build-push-action@v5
+      with:
+        file: ${{ inputs.dockerfile-path }}
+        context: ${{ inputs.dockerfile-context }}
+        push: true
+        tags: |
+          ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+          ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+
+    - name: Deploy CDK
+      env:
+        AWS_ACCOUNT_ID: '${{ steps.environment-setup.outputs.account-id }}'
+        AWS_REGION: 'us-east-1'
+        BRANCH_NAME: ${{ steps.extract_branch.outputs.branch }}
+      shell: bash
+      run: |
+        cd deploy
+        cdk deploy --require-approval never
+
+    - name: Check For Branch Values File
+      id: branch-values-file
+      shell: bash
+      run: |
+        if [ -f ./deploy/helm/${{ steps.extract_branch.outputs.branch }}.values.yaml ]; then
+          echo "Branch values file found"
+          echo "values-file=./deploy/helm/values.yaml,./deploy/helm/${{ steps.extract_branch.outputs.branch }}.values.yaml" >> $GITHUB_OUTPUT;
+        else
+          echo "values-file=./deploy/helm/values.yaml" >> $GITHUB_OUTPUT;
+        fi
+
+    - name: Pull Helm Chart
+      id: pull-mono-chart
+      uses: patriotsoftware/helm-oci-pull-action@v1
+      with:
+        aws-account-id: ${{ steps.environment-setup.outputs.account-id }}
+        ecr-login: true
+        chart-and-tag: ${{ steps.environment-setup.outputs.account-id }}.dkr.ecr.us-east-1.amazonaws.com/monochart:latest
+        aws-region: us-east-1
+
+    - name: Helm Upgrade/Install
+      with:
+         base-chart: ./monochart
+         namespace: time
+         values-file: ${{ steps.branch-values-file.outputs.values-file }}
+         additional-args: "${{ inputs.helm-additional-args }}"
+         additional-values: "${{ steps.environment-setup.outputs.dotnet-environment-type }}=${{ steps.environment-setup.outputs.environment }},awsAccountName=${{ steps.environment-setup.outputs.account-name }},env.base.BRANCH_NAME=${{ steps.extract_branch.outputs.branch }},branchName=${{ steps.extract_branch.outputs.branch }},awsAccountNumber=${{ steps.environment-setup.outputs.account-id }},ecrTag=${{ github.sha }},env.branch.BRANCH_DATABASE=${{  steps.extract_branch.outputs.branch }}"
+         release-name: ${{ steps.environment-setup.outputs.release }}
+         problems-timeout: 120
+      uses: patriotsoftware/helm-upgrade-action@v1
+
+    - id: k6-load-tests
+      env: 
+        INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}.dev-external.patriotsoftware.com/v1
+        INPUT_K6_FLAGS: ${{ inputs.k6-load-flags }}
+        INPUT_K6_SCRIPT: ${{ inputs.k6-load-script-path }}
+        INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-load-additional-mount }}
+      shell: bash
+      run: |
+        if [[ ${{ inputs.k6-load-script-path }} != '' ]]; then
+          k6-test-action.sh
+        fi
+
+    - id: k6-performance-tests
+      env: 
+        INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}.dev-external.patriotsoftware.com/v1
+        INPUT_K6_FLAGS: ${{ inputs.k6-performance-flags }}
+        INPUT_K6_SCRIPT: ${{ inputs.k6-performance-script-path }}
+        INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-performance-additional-mount }}
+      shell: bash
+      run: |
+        if [[ ${{ inputs.k6-performance-script-path }} != '' ]]; then
+          k6-test-action.sh
+        fi
