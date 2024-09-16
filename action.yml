@@ -115,9 +115,9 @@ runs:
         esac
 
         # Determine if the service is external or internal
-        if [[ ${{ inputs.internal }} == "true"]]; then
+        if [[ "${{ inputs.internal }}" == "true"]]; then
           echo "visibility=internal" >> $GITHUB_OUTPUT
-        elif [[ ${{ inputs.internal }} == "false"]]; then
+        elif [[ "${{ inputs.internal }}" == "false"]]; then
           echo "visibility=external" >> $GITHUB_OUTPUT
         else
           echo "Unsupported input for 'internal' flag. Enter \"false\" for external or leave \"true\" for internal."
