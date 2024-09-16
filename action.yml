@@ -93,11 +93,9 @@ runs:
         if [[ "${{ steps.extract_branch.outputs.branch }}" =~ (main|master) ]]; then
           echo "release=${{ inputs.service-name }}" >> $GITHUB_OUTPUT
           echo "ecr-repo=${{ inputs.service-name }}" >> $GITHUB_OUTPUT
-          echo "branch-endpoint-addon=''" >> $GITHUB_OUTPUT
         else
           echo "release=$(echo ${{ inputs.service-name }}-${{ steps.extract_branch.outputs.clean-branch }})" >> $GITHUB_OUTPUT
           echo "ecr-repo=$(echo ${{ inputs.service-name }}/${{ steps.extract_branch.outputs.clean-branch }})" >> $GITHUB_OUTPUT
-          echo "branch-endpoint-addon=-${{ steps.extract_branch.outputs.branch }}" >> $GITHUB_OUTPUT
         fi
         
         # Set the service type for dotnet
@@ -206,7 +204,7 @@ runs:
 
     - id: k6-load-tests
       env: 
-        INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}${{ steps.environment-setup.outputs.branch-endpoint-addon }}.${{ inputs.environment }}-${{ steps.environment-setup.outputs.visibility }}.${{ inputs.domain }}/${{ inputs.swagger-prefix }}
+        INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}.${{ inputs.environment }}-${{ steps.environment-setup.outputs.visibility }}.${{ inputs.domain }}/${{ inputs.swagger-prefix }}
         INPUT_K6_FLAGS: ${{ inputs.k6-load-flags }}
         INPUT_K6_SCRIPT: ${{ inputs.k6-load-script-path }}
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-load-additional-mount }}
@@ -218,7 +216,7 @@ runs:
 
     - id: k6-performance-tests
       env: 
-        INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}${{ steps.environment-setup.outputs.branch-endpoint-addon }}.${{ inputs.environment }}-${{ steps.environment-setup.outputs.visibility }}.${{ inputs.domain }}/${{ inputs.swagger-prefix }}
+        INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}.${{ inputs.environment }}-${{ steps.environment-setup.outputs.visibility }}.${{ inputs.domain }}/${{ inputs.swagger-prefix }}
         INPUT_K6_FLAGS: ${{ inputs.k6-performance-flags }}
         INPUT_K6_SCRIPT: ${{ inputs.k6-performance-script-path }}
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-performance-additional-mount }}
