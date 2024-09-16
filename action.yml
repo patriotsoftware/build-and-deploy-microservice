@@ -101,18 +101,14 @@ runs:
         fi
         
         # Set the service type for dotnet
-        case ${{ inputs.dotnet-type }} in
-        aspnet)
+        if [[ "${{ inputs.dotnet-type }}" == "aspnet" ]]; then
           echo "dotnet-environment-type=env.base.ASPNETCORE_ENVIRONMENT" >> $GITHUB_OUTPUT
-          ;;
-        dotnet)
+        elif [[ "${{ inputs.dotnet-type }}" == "dotnet" ]]; then
           echo "dotnet-environment-type=env.base.DOTNET_ENVIRONMENT" >> $GITHUB_OUTPUT
-          ;;
-        *)
+        else
           echo "Unsupported service type. Set 'dotnet-type' to either 'aspnet' or 'dotnet'."
           exit 1
-          ;;
-        esac
+        fi
 
         # Determine if the service is external or internal
         if [[ "${{ inputs.internal }}" == "true"]]; then
@@ -138,7 +134,8 @@ runs:
           echo "account-name=psiprod" >> $GITHUB_OUTPUT
           ;;
         *)
-          echo -n "Unsupported Account, available options; dev, staging, prod, dba"
+          echo -n "Unsupported Account, available options; dev, staging, prod"
+          exit 1
           ;;
         esac
 
