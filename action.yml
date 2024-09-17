@@ -157,7 +157,7 @@ runs:
     - name: Pull image from Source AWS Account
       shell: bash
       run: |
-        if [[ ! "${{ inputs.dockerfile-path }}" ]] && [[ "${{ inputs.pull-through-aws-access-key-id }}" != "" ]] && [[ "${{ inputs.pull-through-aws-secret-access-key }}" != "" ]]; then
+        if [[ "${{ inputs.dockerfile-path }}" = "" ]] && [[ "${{ inputs.pull-through-aws-access-key-id }}" != "" ]] && [[ "${{ inputs.pull-through-aws-secret-access-key }}" != "" ]]; then
           mkdir -p ~/.aws
           cat "[default]" > ~/.aws/credentials
           cat "aws_access_key_id = ${{ inputs.pull-through-aws-access-key-id }}" >> ~/.aws/credentials
