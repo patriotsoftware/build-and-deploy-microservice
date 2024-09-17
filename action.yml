@@ -266,6 +266,7 @@ runs:
           sleep 60
         else
           echo "No K6 tests specified, skipping sleep."
+        fi
 
     - name: K6 Load Tests
       id: k6-load-tests
