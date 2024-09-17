@@ -154,7 +154,7 @@ runs:
         esac
 
     - name: Authenticate with AWS for Pull Through
-      if:  ${{ inputs.dockerfile-path }} && ${{ inputs.pull-through-aws-access-key-id }} != "" && ${{ inputs.pull-through-aws-secret-access-key }} != "" && ${{ inputs.k6-custom-script-path }}
+      if:  ${{ inputs.dockerfile-path }} && ${{ inputs.pull-through-aws-access-key-id }} != '' && ${{ inputs.pull-through-aws-secret-access-key }} != '' && ${{ inputs.k6-custom-script-path }}
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ inputs.pull-through-aws-access-key-id }}
@@ -163,11 +163,11 @@ runs:
 
     - name: Login to Amazon ECR for Pull Through
       id: login-ecr
-      if:  ${{ inputs.dockerfile-path }} == "" && ${{ inputs.pull-through-aws-access-key-id }} != "" && ${{ inputs.pull-through-aws-secret-access-key }} != "" && ${{ inputs.k6-custom-script-path }} == ""
+      if:  ${{ inputs.dockerfile-path }} && ${{ inputs.pull-through-aws-access-key-id }} != '' && ${{ inputs.pull-through-aws-secret-access-key }} != '' && ${{ inputs.k6-custom-script-path }}
       uses: aws-actions/amazon-ecr-login@v2
 
     - name: Pull image from Source AWS Account
-      if:  ${{ inputs.dockerfile-path }} == "" && ${{ inputs.pull-through-aws-access-key-id }} != "" && ${{ inputs.pull-through-aws-secret-access-key }} != "" && ${{ inputs.k6-custom-script-path }} == ""
+      if:  ${{ inputs.dockerfile-path }} && ${{ inputs.pull-through-aws-access-key-id }} != '' && ${{ inputs.pull-through-aws-secret-access-key }} != '' && ${{ inputs.k6-custom-script-path }}
       shell: bash
       run: |
         PULL_THROUGH_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
