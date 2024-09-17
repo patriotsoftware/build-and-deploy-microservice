@@ -261,7 +261,7 @@ runs:
     - name: K6 Test Buffer
       shell: bash
       run: |
-        if [[ ! -z ${{ inputs.k6-load-script-path }} ]] || [[ ! -z ${{ inputs.k6-performance-script-path }} ]] || [[ ! -z ${{ inputs.k6-custom-script-path }} ]]; then
+        if [[ ! -z "${{ inputs.k6-load-script-path }}" ]] || [[ ! -z "${{ inputs.k6-performance-script-path }}" ]] || [[ ! -z "${{ inputs.k6-custom-script-path }}" ]]; then
           echo "Starting K6 after 60s warm-up delay..."
           sleep 60
         else
