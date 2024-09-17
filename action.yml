@@ -73,7 +73,7 @@ inputs:
     description: Additional mount point (directory) utilized by the K6 script
     required: false
   k6-custom-script-path:
-    description: Set the path to a specific K6 test to be run individually. This is for any additional K6 scripts
+    description: Set the path to a specific K6 test to be run individually. This is for any additional K6 script
     required: false
   k6-custom-flags:
     description: Additional flags to pass to the K6 command
