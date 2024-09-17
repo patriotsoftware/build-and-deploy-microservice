@@ -257,6 +257,15 @@ runs:
          release-name: ${{ steps.environment-setup.outputs.release }}
          problems-timeout: 120
       uses: patriotsoftware/helm-upgrade-action@v1
+    
+    - name: K6 Test Buffer
+      shell: bash
+      run: |
+        if [[ ! -z ${{ inputs.k6-load-script-path }} ]] || [[ ! -z ${{ inputs.k6-performance-script-path }} ]] || [[ ! -z ${{ inputs.k6-custom-script-path }} ]]; then
+          echo "Starting K6 after 60s warm-up delay..."
+          sleep 60
+        else
+          echo "No K6 tests specified, skipping sleep."
 
     - name: K6 Load Tests
       id: k6-load-tests
@@ -267,7 +276,7 @@ runs:
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-load-additional-mount }}
       shell: bash
       run: |
-        if [[ ! -z ${{ inputs.k6-load-script-path }} ]]; then
+        if [[ ! -z "${{ inputs.k6-load-script-path }}" ]]; then
           ${{ github.action_path }}/k6-test-action.sh
         fi
 
@@ -280,7 +289,7 @@ runs:
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-performance-additional-mount }}
       shell: bash
       run: |
-        if [[ ! -z ${{ inputs.k6-performance-script-path }} ]]; then
+        if [[ ! -z "${{ inputs.k6-performance-script-path }}" ]]; then
           ${{ github.action_path }}/k6-test-action.sh
         fi
 
@@ -293,6 +302,6 @@ runs:
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-custom-additional-mount }}
       shell: bash
       run: |
-        if [[ ! -z ${{ inputs.k6-custom-script-path }} ]]; then
+        if [[ ! -z "${{ inputs.k6-custom-script-path }}" ]]; then
           ${{ github.action_path }}/k6-test-action.sh
         fi

@@ -9,8 +9,6 @@ if [[ -n "${INPUT_BASE_URL_OVERRIDE}" ]]; then
     echo "${INPUT_BASE_URL_OVERRIDE}"
 fi
 
-echo "Starting K6 after 60s warm-up delay..."
-sleep 60
 echo "Starting K6 tests."
 
 acct=$(aws sts get-caller-identity --query 'Account' --output text)
