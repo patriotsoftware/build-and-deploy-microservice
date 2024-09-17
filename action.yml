@@ -160,9 +160,11 @@ runs:
         if [[ -z "${{ inputs.dockerfile-path }}" ]]; then
           if [[ -n "${{ inputs.pull-through-aws-access-key-id }}" ]] && [[ -n "${{ inputs.pull-through-aws-secret-access-key }}" ]]; then
             mkdir -p ~/.aws
-            cat "[default]" > ~/.aws/credentials
-            cat "aws_access_key_id = ${{ inputs.pull-through-aws-access-key-id }}" >> ~/.aws/credentials
-            cat "aws_secret_access_key = ${{ inputs.pull-through-aws-secret-access-key }}" >> ~/.aws/credentials
+            cat <<EOF > ~/.aws/credentials
+            [default]
+            aws_access_key_id = ${{ inputs.pull-through-aws-access-key-id }}
+            aws_secret_access_key = ${{ inputs.pull-through-aws-secret-access-key }}
+            EOF
             pull-through-account-id=$(aws sts get-caller-identity --query Account --output text)
             aws ecr get-login-password --region ${{ inputs.pull-through-aws-region }} | docker login --username AWS --password-stdin ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com
             # docker pull ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
