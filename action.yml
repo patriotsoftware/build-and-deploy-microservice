@@ -206,8 +206,8 @@ runs:
       if: ${{ inputs.dockerfile-path }} = "" && ${{ inputs.pull-through-aws-access-key-id }} != "" && ${{ inputs.pull-through-aws-secret-access-key }} != "" && ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: |
-        docker tag ${{ inputs.service }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
-        docker tag ${{ inputs.service }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+        docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+        docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
         docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
         docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
 
