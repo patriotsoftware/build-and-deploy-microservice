@@ -197,7 +197,7 @@ runs:
       if: ${{ inputs.dockerfile-path }} && ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: |
-        docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ input.dockerfile-extra-args }} -f ${{ inputs.dockerfile-path }} ${{ inputs.dockerfile-context }}
+        docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ inputs.dockerfile-extra-args }} -f ${{ inputs.dockerfile-path }} ${{ inputs.dockerfile-context }}
         docker tag ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
         docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
         docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
