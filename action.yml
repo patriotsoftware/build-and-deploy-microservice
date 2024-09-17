@@ -73,7 +73,7 @@ inputs:
     description: Additional mount point (directory) utilized by the K6 script
     required: false
   k6-custom-script-path:
-    description: Set the path to a specific K6 test to be run individually. This will negate the build and deploy process. This replaces the old K6 action
+    description: Set the path to a specific K6 test to be run individually. This is for any additional K6 scripts
     required: false
   k6-custom-flags:
     description: Additional flags to pass to the K6 command
@@ -153,28 +153,28 @@ runs:
           ;;
         esac
 
-    - name: Authenticate with AWS for Pull Through
-      if:  ${{ inputs.dockerfile-path }} && ${{ inputs.pull-through-aws-access-key-id }} != '' && ${{ inputs.pull-through-aws-secret-access-key }} != '' && ${{ inputs.k6-custom-script-path }}
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ inputs.pull-through-aws-access-key-id }}
-        aws-secret-access-key: ${{ inputs.pull-through-aws-secret-access-key }}
-        aws-region: ${{ inputs.pull-through-aws-region }}
-
-    - name: Login to Amazon ECR for Pull Through
-      id: login-ecr
-      if:  ${{ inputs.dockerfile-path }} && ${{ inputs.pull-through-aws-access-key-id }} != '' && ${{ inputs.pull-through-aws-secret-access-key }} != '' && ${{ inputs.k6-custom-script-path }}
-      uses: aws-actions/amazon-ecr-login@v2
-
+    # Log into the pull through account, pull the required image, and tag it for use in a later step. Clean up credentials afterwards.
     - name: Pull image from Source AWS Account
-      if:  ${{ inputs.dockerfile-path }} && ${{ inputs.pull-through-aws-access-key-id }} != '' && ${{ inputs.pull-through-aws-secret-access-key }} != '' && ${{ inputs.k6-custom-script-path }}
       shell: bash
       run: |
-        PULL_THROUGH_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
-        # docker pull ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:${{ github.sha }}
-        # docker tag ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:${{ github.sha }} ${{ inputs.service-name }}-pull-through-image
-        docker pull ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:latest
-        docker tag ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:latest ${{ inputs.service-name }}-pull-through-image
+        if [[ "${{ inputs.dockerfile-path }}" == "" ]] && [[ "${{ inputs.pull-through-aws-access-key-id }}" != "" ]] && [[ "${{ inputs.pull-through-aws-secret-access-key }}" != "" ]]; then
+          mkdir -p ~/.aws
+          cat <<EOF > ~/.aws/credentials
+          [default]
+          aws_access_key_id = ${{ inputs.pull-through-aws-access-key-id }}
+          aws_secret_access_key = ${{ inputs.pull-through-aws-secret-access-key }}
+          EOF
+          pull-through-account-id=$(aws sts get-caller-identity --query Account --output text)
+          aws ecr get-login-password --region ${{ inputs.pull-through-aws-region }} | docker login --username AWS --password-stdin ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com
+          # docker pull ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+          # docker tag ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ inputs.service-name }}-pull-through-image
+          docker pull ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+          docker tag ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:latest ${{ inputs.service-name }}-pull-through-image
+          rm ~/.aws/credentials
+        else
+          echo "No Dockerfile or Pull Through Account was set. Exiting."
+          exit 1
+        fi
 
     - name: Authenticate with AWS
       uses: aws-actions/configure-aws-credentials@v4
@@ -184,35 +184,34 @@ runs:
         aws-region: us-east-1
 
     - name: Login to Amazon ECR
-      if:  ${{ inputs.k6-custom-script-path }} == ""
-      id: login-ecr-pull-through
+      id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
     - name: Create ECR Repository
-      if:  ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: aws ecr create-repository --repository-name ${{ steps.environment-setup.outputs.ecr-repo }} || echo "Repository exists already. Skipping creation."
 
-    - name: Build and Push image
-      if: ${{ inputs.dockerfile-path }} != "" && ${{ inputs.k6-custom-script-path }} == ""
-      shell: bash
-      run: |
-        docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ inputs.dockerfile-extra-args }} -f ${{ inputs.dockerfile-path }} ${{ inputs.dockerfile-context }}
-        docker tag ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
-        docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
-        docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
-
     - name: Push ECR Image from Pull through
-      if: ${{ inputs.dockerfile-path }} = "" && ${{ inputs.pull-through-aws-access-key-id }} != "" && ${{ inputs.pull-through-aws-secret-access-key }} != "" && ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: |
-        docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
-        docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
-        docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
-        docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+        if [[ "${{ inputs.dockerfile-path }}" == "" ]] && [[ "${{ inputs.pull-through-aws-access-key-id }}" != "" ]] && [[ "${{ inputs.pull-through-aws-secret-access-key }}" != "" ]]; then
+          docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+          docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+        fi
+
+    - name: Build and Push image
+      shell: bash
+      run: |
+        if [[ "${{ inputs.dockerfile-path }}" != "" ]]; then
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ input.dockerfile-extra-args }} -f ${{ inputs.dockerfile-path }} ${{ inputs.dockerfile-context }}
+          docker tag ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+        fi
 
     - name: Deploy CDK
-      if:  ${{ inputs.k6-custom-script-path }} == ""
       env:
         AWS_ACCOUNT_ID: '${{ steps.environment-setup.outputs.account-id }}'
         AWS_REGION: 'us-east-1'
@@ -224,7 +223,6 @@ runs:
 
     - name: Check For Branch Values File
       id: branch-values-file
-      if: ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: |
         if [ -f ./deploy/helm/${{ steps.extract_branch.outputs.branch }}.values.yaml ]; then
@@ -235,7 +233,6 @@ runs:
         fi
 
     - name: Pull Helm Chart
-      if:  ${{ inputs.k6-custom-script-path }} == ""
       id: pull-mono-chart
       uses: patriotsoftware/helm-oci-pull-action@v1
       with:
@@ -245,7 +242,6 @@ runs:
         aws-region: us-east-1
 
     - name: Helm Upgrade/Install
-      if:  ${{ inputs.k6-custom-script-path }} == ""
       with:
          base-chart: ./monochart
          namespace: time
@@ -258,33 +254,39 @@ runs:
 
     - name: K6 Load Tests
       id: k6-load-tests
-      if: ${{ inputs.k6-load-script-path }} != "" && ${{ inputs.k6-custom-script-path }} == ""
       env:
         INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}.${{ inputs.environment }}-${{ steps.environment-setup.outputs.visibility }}.${{ inputs.domain }}/${{ inputs.swagger-prefix }}
         INPUT_K6_FLAGS: ${{ inputs.k6-load-flags }}
         INPUT_K6_SCRIPT: ${{ inputs.k6-load-script-path }}
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-load-additional-mount }}
       shell: bash
-      run: ${{ github.action_path }}/k6-test-action.sh
+      run: |
+        if [[ ${{ inputs.k6-load-script-path }} != '' ]]; then
+          ${{ github.action_path }}/k6-test-action.sh
+        fi
 
     - name: K6 Performance Tests
       id: k6-performance-tests
-      if: ${{ inputs.k6-performance-script-path }} && ${{ inputs.k6-custom-script-path }} == ""
       env:
         INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}.${{ inputs.environment }}-${{ steps.environment-setup.outputs.visibility }}.${{ inputs.domain }}/${{ inputs.swagger-prefix }}
         INPUT_K6_FLAGS: ${{ inputs.k6-performance-flags }}
         INPUT_K6_SCRIPT: ${{ inputs.k6-performance-script-path }}
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-performance-additional-mount }}
       shell: bash
-      run: ${{ github.action_path }}/k6-test-action.sh
+      run: |
+        if [[ ${{ inputs.k6-performance-script-path }} != '' ]]; then
+          ${{ github.action_path }}/k6-test-action.sh
+        fi
 
     - name: Custom K6 Test
       id: k6-custom-test
-      if: ${{ inputs.k6-custom-script-path }} != ""
       env: 
         INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}.${{ inputs.environment }}-${{ steps.environment-setup.outputs.visibility }}.${{ inputs.domain }}/${{ inputs.swagger-prefix }}
         INPUT_K6_FLAGS: ${{ inputs.k6-custom-flags }}
         INPUT_K6_SCRIPT: ${{ inputs.k6-custom-script-path }}
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-custom-additional-mount }}
       shell: bash
-      run: ${{ github.action_path }}/k6-test-action.sh
+      run: |
+        if [[ ${{ inputs.k6-custom-script-path }} != '' ]]; then
+          ${{ github.action_path }}/k6-test-action.sh
+        fi
