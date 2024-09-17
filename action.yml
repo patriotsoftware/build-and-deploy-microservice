@@ -170,11 +170,11 @@ runs:
       if:  ${{ inputs.dockerfile-path }} == "" && ${{ inputs.pull-through-aws-access-key-id }} && ${{ inputs.pull-through-aws-secret-access-key }} && ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: |
-        pull-through-account-id=$(aws sts get-caller-identity --query Account --output text)
-        # docker pull ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:${{ github.sha }}
-        # docker tag ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:${{ github.sha }} ${{ inputs.service }}-pull-through-image
-        docker pull ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:latest
-        docker tag ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:latest ${{ inputs.service }}-pull-through-image
+        PULL_THROUGH_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        # docker pull ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:${{ github.sha }}
+        # docker tag ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:${{ github.sha }} ${{ inputs.service }}-pull-through-image
+        docker pull ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:latest
+        docker tag ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ inputs.service-name }}:latest ${{ inputs.service }}-pull-through-image
 
     - name: Authenticate with AWS
       uses: aws-actions/configure-aws-credentials@v4
