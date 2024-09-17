@@ -157,21 +157,25 @@ runs:
     - name: Pull Image from Source AWS Account
       shell: bash
       run: |
-        if [[ -z "${{ inputs.dockerfile-path }}" ]] || ([[ -n "${{ inputs.pull-through-aws-access-key-id }}" ]] && [[ -n "${{ inputs.pull-through-aws-secret-access-key }}" ]]); then
-          mkdir -p ~/.aws
-          cat "[default]" > ~/.aws/credentials
-          cat "aws_access_key_id = ${{ inputs.pull-through-aws-access-key-id }}" >> ~/.aws/credentials
-          cat "aws_secret_access_key = ${{ inputs.pull-through-aws-secret-access-key }}" >> ~/.aws/credentials
-          pull-through-account-id=$(aws sts get-caller-identity --query Account --output text)
-          aws ecr get-login-password --region ${{ inputs.pull-through-aws-region }} | docker login --username AWS --password-stdin ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com
-          # docker pull ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
-          # docker tag ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ inputs.service-name }}-pull-through-image
-          docker pull ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:latest
-          docker tag ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:latest ${{ inputs.service-name }}-pull-through-image
-          rm ~/.aws/credentials
+        if [[ -z "${{ inputs.dockerfile-path }}" ]]; then
+          if [[ -n "${{ inputs.pull-through-aws-access-key-id }}" ]] && [[ -n "${{ inputs.pull-through-aws-secret-access-key }}" ]]; then
+            mkdir -p ~/.aws
+            cat "[default]" > ~/.aws/credentials
+            cat "aws_access_key_id = ${{ inputs.pull-through-aws-access-key-id }}" >> ~/.aws/credentials
+            cat "aws_secret_access_key = ${{ inputs.pull-through-aws-secret-access-key }}" >> ~/.aws/credentials
+            pull-through-account-id=$(aws sts get-caller-identity --query Account --output text)
+            aws ecr get-login-password --region ${{ inputs.pull-through-aws-region }} | docker login --username AWS --password-stdin ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com
+            # docker pull ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+            # docker tag ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ inputs.service-name }}-pull-through-image
+            docker pull ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+            docker tag ${pull-through-account-id}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:latest ${{ inputs.service-name }}-pull-through-image
+            rm ~/.aws/credentials
+          else
+            echo "No Dockerfile or Pull Through Account was set. Exiting."
+            exit 1
+          fi
         else
-          echo "No Dockerfile or Pull Through Account was set. Exiting."
-          exit 1
+          echo "Dockerfile specified - Skipping Pull Through Pull step."
         fi
 
     - name: Authenticate with AWS
@@ -192,11 +196,15 @@ runs:
     - name: Push ECR Image from Pull Through
       shell: bash
       run: |
-        if [[ -z "${{ inputs.dockerfile-path }}" ]] || ([[ -n "${{ inputs.pull-through-aws-access-key-id }}" ]] && [[ -n "${{ inputs.pull-through-aws-secret-access-key }}" ]]); then
-          docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
-          docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+        if [[ -z "${{ inputs.dockerfile-path }}" ]]; then
+          if [[ -n "${{ inputs.pull-through-aws-access-key-id }}" ]] && [[ -n "${{ inputs.pull-through-aws-secret-access-key }}" ]]; then
+            docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+            docker tag ${{ inputs.service-name }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+            docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+            docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
+          fi
+        else
+          echo "Dockerfile specified - Skipping Pull Through Push step."
         fi
 
     - name: Build and Push Image
