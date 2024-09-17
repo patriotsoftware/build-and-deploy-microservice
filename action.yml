@@ -154,7 +154,7 @@ runs:
         esac
 
     - name: Authenticate with AWS for Pull Through
-      if:  ${{ inputs.dockerfile-path }} == "" && ${{ inputs.pull-through-aws-access-key-id }} && ${{ inputs.pull-through-aws-secret-access-key }} && ${{ inputs.k6-custom-script-path }} == ""
+      if:  ${{ inputs.dockerfile-path }} == "" && ${{ inputs.pull-through-aws-access-key-id }} != "" && ${{ inputs.pull-through-aws-secret-access-key }} != "" && ${{ inputs.k6-custom-script-path }} == ""
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ inputs.pull-through-aws-access-key-id }}
@@ -163,11 +163,11 @@ runs:
 
     - name: Login to Amazon ECR for Pull Through
       id: login-ecr
-      if:  ${{ inputs.dockerfile-path }} == "" && ${{ inputs.pull-through-aws-access-key-id }} && ${{ inputs.pull-through-aws-secret-access-key }} && ${{ inputs.k6-custom-script-path }} == ""
+      if:  ${{ inputs.dockerfile-path }} == "" && ${{ inputs.pull-through-aws-access-key-id }} != "" && ${{ inputs.pull-through-aws-secret-access-key }} != "" && ${{ inputs.k6-custom-script-path }} == ""
       uses: aws-actions/amazon-ecr-login@v2
 
     - name: Pull image from Source AWS Account
-      if:  ! ${{ inputs.dockerfile-path }} && ${{ inputs.pull-through-aws-access-key-id }} && ${{ inputs.pull-through-aws-secret-access-key }} && ${{ inputs.k6-custom-script-path }} == ""
+      if:  ${{ inputs.dockerfile-path }} == "" && ${{ inputs.pull-through-aws-access-key-id }} != "" && ${{ inputs.pull-through-aws-secret-access-key }} != "" && ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: |
         PULL_THROUGH_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
@@ -194,7 +194,7 @@ runs:
       run: aws ecr create-repository --repository-name ${{ steps.environment-setup.outputs.ecr-repo }} || echo "Repository exists already. Skipping creation."
 
     - name: Build and Push image
-      if: ${{ inputs.dockerfile-path }} && ${{ inputs.k6-custom-script-path }} == ""
+      if: ${{ inputs.dockerfile-path }} != "" && ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: |
         docker build -t ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ inputs.dockerfile-extra-args }} -f ${{ inputs.dockerfile-path }} ${{ inputs.dockerfile-context }}
@@ -203,7 +203,7 @@ runs:
         docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:latest
 
     - name: Push ECR Image from Pull through
-      if: ${{ inputs.dockerfile-path }} = "" && ${{ inputs.pull-through-aws-access-key-id }} && ${{ inputs.pull-through-aws-secret-access-key }} && ${{ inputs.k6-custom-script-path }} == ""
+      if: ${{ inputs.dockerfile-path }} = "" && ${{ inputs.pull-through-aws-access-key-id }} != "" && ${{ inputs.pull-through-aws-secret-access-key }} != "" && ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: |
         docker tag ${{ inputs.service }}-pull-through-image ${{ steps.login-ecr.outputs.registry }}/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
@@ -223,8 +223,8 @@ runs:
         cdk deploy --require-approval never
 
     - name: Check For Branch Values File
-      if: ${{ inputs.k6-custom-script-path }} == ""
       id: branch-values-file
+      if: ${{ inputs.k6-custom-script-path }} == ""
       shell: bash
       run: |
         if [ -f ./deploy/helm/${{ steps.extract_branch.outputs.branch }}.values.yaml ]; then
@@ -258,7 +258,7 @@ runs:
 
     - name: K6 Load Tests
       id: k6-load-tests
-      if: ${{ inputs.k6-load-script-path }} && ${{ inputs.k6-custom-script-path }} == ""
+      if: ${{ inputs.k6-load-script-path }} != "" && ${{ inputs.k6-custom-script-path }} == ""
       env:
         INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}.${{ inputs.environment }}-${{ steps.environment-setup.outputs.visibility }}.${{ inputs.domain }}/${{ inputs.swagger-prefix }}
         INPUT_K6_FLAGS: ${{ inputs.k6-load-flags }}
@@ -280,7 +280,7 @@ runs:
 
     - name: Custom K6 Test
       id: k6-custom-test
-      if: ${{ inputs.k6-custom-script-path }}
+      if: ${{ inputs.k6-custom-script-path }} != ""
       env: 
         INPUT_BASE_URL_OVERRIDE: https://${{ steps.environment-setup.outputs.release }}.${{ inputs.environment }}-${{ steps.environment-setup.outputs.visibility }}.${{ inputs.domain }}/${{ inputs.swagger-prefix }}
         INPUT_K6_FLAGS: ${{ inputs.k6-custom-flags }}
