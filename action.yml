@@ -159,7 +159,7 @@ runs:
       run: |
         if [[ "${{ inputs.dockerfile-path }}" == "" ]] && [[ "${{ inputs.pull-through-aws-access-key-id }}" != "" ]] && [[ "${{ inputs.pull-through-aws-secret-access-key }}" != "" ]]; then
           mkdir -p ~/.aws
-          cat <<EOF > ~/.aws/credentials
+          cat << EOF > ~/.aws/credentials
           [default]
           aws_access_key_id = ${{ inputs.pull-through-aws-access-key-id }}
           aws_secret_access_key = ${{ inputs.pull-through-aws-secret-access-key }}
