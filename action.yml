@@ -185,7 +185,7 @@ runs:
 
     - name: Login to Amazon ECR
       if:  ${{ inputs.k6-custom-script-path }} == ""
-      id: login-ecr
+      id: login-ecr-pull-through
       uses: aws-actions/amazon-ecr-login@v2
 
     - name: Create ECR Repository
