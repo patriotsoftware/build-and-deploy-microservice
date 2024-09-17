@@ -167,10 +167,8 @@ runs:
         EOF
             PULL_THROUGH_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
             aws ecr get-login-password --region ${{ inputs.pull-through-aws-region }} | docker login --username AWS --password-stdin ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com
-            # docker pull ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
-            # docker tag ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ inputs.service-name }}-pull-through-image
-            docker pull ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:latest
-            docker tag ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:latest ${{ inputs.service-name }}-pull-through-image
+            docker pull ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
+            docker tag ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ inputs.service-name }}-pull-through-image
             rm ~/.aws/credentials
           else
             echo "No Dockerfile or Pull Through Account was set. Exiting."
