@@ -267,7 +267,7 @@ runs:
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-load-additional-mount }}
       shell: bash
       run: |
-        if [[ -n ${{ inputs.k6-load-script-path }} ]]; then
+        if [[ ! -z ${{ inputs.k6-load-script-path }} ]]; then
           ${{ github.action_path }}/k6-test-action.sh
         fi
 
@@ -280,7 +280,7 @@ runs:
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-performance-additional-mount }}
       shell: bash
       run: |
-        if [[ -n ${{ inputs.k6-performance-script-path }} ]]; then
+        if [[ ! -z ${{ inputs.k6-performance-script-path }} ]]; then
           ${{ github.action_path }}/k6-test-action.sh
         fi
 
@@ -293,6 +293,6 @@ runs:
         INPUT_ADDITIONAL_MOUNT: ${{ inputs.k6-custom-additional-mount }}
       shell: bash
       run: |
-        if [[ -n ${{ inputs.k6-custom-script-path }} ]]; then
+        if [[ ! -z ${{ inputs.k6-custom-script-path }} ]]; then
           ${{ github.action_path }}/k6-test-action.sh
         fi
