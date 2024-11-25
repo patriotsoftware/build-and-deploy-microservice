@@ -156,10 +156,10 @@ runs:
         file: ${{ inputs.dockerfile-path }}
         context: ${{ inputs.docker-context }}
         push: true
+        build-args: ${{ inputs.docker-build-args }}
         tags: |
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ github.sha }}
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:latest
-        build-args: ${{ inputs.docker-build-args }}
 
     - name: Create Branch Database
       id: create-branch-database
