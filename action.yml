@@ -159,7 +159,7 @@ runs:
         tags: |
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ github.sha }}
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:latest
-        args: |
+        build-args: |
          ${{ inputs.docker-build-args }}
 
     - name: Create Branch Database
