@@ -110,52 +110,9 @@ runs:
           echo "helm-namespace=${{ inputs.helm-namespace }}" >> $GITHUB_OUTPUT
         fi
 
-<<<<<<< HEAD
-        case ${{ inputs.environment }} in
-        dev)
-          echo "environment=Development" >> $GITHUB_OUTPUT
-          echo "account-name=psidev" >> $GITHUB_OUTPUT
-          ;;
-        staging)
-          echo "environment=Staging" >> $GITHUB_OUTPUT
-          echo "account-name=psistaging" >> $GITHUB_OUTPUT
-          ;;
-        prod)
-          echo "environment=Production" >> $GITHUB_OUTPUT
-          echo "account-name=psiprod" >> $GITHUB_OUTPUT
-          ;;
-        *)
-          echo -n "Unsupported Account, available options; dev, staging, prod"
-          exit 1
-          ;;
-        esac
-
-    # Log into the pull through account, pull the required image, and tag it for use in a later step. Clean up credentials afterwards.
-    - name: Pull Image from Source AWS Account
-      shell: bash
-      run: |
-        if [[ -z "${{ inputs.dockerfile-path }}" ]]; then
-          if [[ -n "${{ inputs.pull-through-aws-access-key-id }}" ]] && [[ -n "${{ inputs.pull-through-aws-secret-access-key }}" ]]; then
-            mkdir -p ~/.aws
-            cat <<EOF > ~/.aws/credentials
-        [default]
-        aws_access_key_id = ${{ inputs.pull-through-aws-access-key-id }}
-        aws_secret_access_key = ${{ inputs.pull-through-aws-secret-access-key }}
-        EOF
-            PULL_THROUGH_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-            aws ecr get-login-password --region ${{ inputs.pull-through-aws-region }} | docker login --username AWS --password-stdin ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com
-            docker pull ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }}
-            docker tag ${PULL_THROUGH_ACCOUNT_ID}.dkr.ecr.${{ inputs.pull-through-aws-region }}.amazonaws.com/${{ steps.environment-setup.outputs.ecr-repo }}:${{ github.sha }} ${{ inputs.service-name }}-pull-through-image
-            rm ~/.aws/credentials
-          else
-            echo "No Dockerfile or Pull Through Account was set. Exiting."
-            exit 1
-          fi
-=======
         if [[ "${{ steps.job-values.outputs.branch }}" =~ (main|master) ]]; then
           echo "release=${{ inputs.release-name }}" >> $GITHUB_OUTPUT
           echo "ecr-repo=${{ inputs.release-name }}" >> $GITHUB_OUTPUT
->>>>>>> 061092c (Combine build and deploy actions into one)
         else
           echo "release=$(echo ${{ inputs.release-name }}-${{ steps.job-values.outputs.clean-branch }})" >> $GITHUB_OUTPUT
           echo "ecr-repo=$(echo ${{ inputs.release-name }}/${{ steps.job-values.outputs.clean-branch }})" >> $GITHUB_OUTPUT
