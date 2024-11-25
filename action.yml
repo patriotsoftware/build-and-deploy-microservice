@@ -22,6 +22,9 @@ inputs:
     description: 'The Docker context to build the Dockerfile from. Default is "."'
     required: false
     default: '.'
+  docker-build-args:
+    description: 'Additional Docker build args to pass to the Docker Build custom action.'
+    required: false
   # Branch Database Configuration
   deploy-branch-database:
     description: 'Deploy branch database. Default is "true"'
@@ -156,6 +159,8 @@ runs:
         tags: |
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ github.sha }}
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:latest
+        args: |
+         ${{ inputs.docker-build-args }}
 
     - name: Create Branch Database
       id: create-branch-database
