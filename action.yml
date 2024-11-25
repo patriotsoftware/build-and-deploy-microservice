@@ -36,6 +36,9 @@ inputs:
   database-startup-project:
     description: 'The database startup project (-s flag) for the database update step. Required if deploying the branch database.'
     required: false
+  database-dotnet-ef-tool-version:
+    description: 'The EF Tools version to download for branch database deployments.'
+    required: false
   # CDK Configuration
   deploy-cdk:
     description: 'Determine to deploy CDK or not. Default is "false".'
@@ -150,7 +153,7 @@ runs:
       shell: bash
       run: cp /home/runner/.nuget/NuGet/NuGet.Config ./nuget.config
 
-    - name: Build and Push
+    - name: Build and Push Docker Image
       uses: docker/build-push-action@v5
       with:
         file: ${{ inputs.dockerfile-path }}
@@ -174,7 +177,7 @@ runs:
         if dotnet tool list -g | grep -q dotnet-ef; then
           echo "EF Core CLI Already Installed"
         else
-          dotnet tool install -g dotnet-ef --version ${{ inputs.dotnet-ef-tool-version }}
+          dotnet tool install -g dotnet-ef --version ${{ inputs.database-dotnet-ef-tool-version }}
           echo "EF Core CLI now installed."
         fi
 
