@@ -88,8 +88,15 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Set Job Values
-      id: job-values
+    - name: Authenticate with AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ inputs.aws-access-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-region: ${{ inputs.aws-region }}
+
+    - name: Extract Branch name and AWS Account ID
+      id: core-values
       shell: bash
       run: |
         export UNESCAPED_BRANCH_NAME=${GITHUB_REF#refs/heads/}
@@ -98,8 +105,12 @@ runs:
         echo "clean-branch=$(echo ${UNESCAPED_BRANCH_NAME} | sed 's/_//g' | tr '[:upper:]' '[:lower:]' | cut -c -38)" >> $GITHUB_OUTPUT
         echo "aws-account-id=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
 
+    - name: Set Job Values
+      id: job-values
+      shell: bash
+      run: |
         if [[ "${{ inputs.helm-base-chart }}" == "monochart" ]]; then
-          echo "helm-chart=${{ steps.job-values.outputs.aws-account-id }}.dkr.ecr.us-east-1.amazonaws.com/monochart" >> $GITHUB_OUTPUT
+          echo "helm-chart=${{ steps.core-values.outputs.aws-account-id }}.dkr.ecr.us-east-1.amazonaws.com/monochart" >> $GITHUB_OUTPUT
         else
           echo "helm-chart=${{ inputs.helm-base-chart }}" >> $GITHUB_OUTPUT
         fi
@@ -110,20 +121,13 @@ runs:
           echo "helm-namespace=${{ inputs.helm-namespace }}" >> $GITHUB_OUTPUT
         fi
 
-        if [[ "${{ steps.job-values.outputs.branch }}" =~ (main|master) ]]; then
+        if [[ "${{ steps.core-values.outputs.branch }}" =~ (main|master) ]]; then
           echo "release=${{ inputs.release-name }}" >> $GITHUB_OUTPUT
           echo "ecr-repo=${{ inputs.release-name }}" >> $GITHUB_OUTPUT
         else
-          echo "release=$(echo ${{ inputs.release-name }}-${{ steps.job-values.outputs.clean-branch }})" >> $GITHUB_OUTPUT
-          echo "ecr-repo=$(echo ${{ inputs.release-name }}/${{ steps.job-values.outputs.clean-branch }})" >> $GITHUB_OUTPUT
+          echo "release=$(echo ${{ inputs.release-name }}-${{ steps.core-values.outputs.clean-branch }})" >> $GITHUB_OUTPUT
+          echo "ecr-repo=$(echo ${{ inputs.release-name }}/${{ steps.core-values.outputs.clean-branch }})" >> $GITHUB_OUTPUT
         fi
-
-    - name: Authenticate with AWS
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ inputs.aws-access-key-id }}
-        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
-        aws-region: ${{ inputs.aws-region }}
 
     - name: Login to Amazon ECR
       id: login-ecr
@@ -157,7 +161,7 @@ runs:
       id: create-branch-database
       if: ${{ inputs.deploy-branch-database == 'true' }}
       shell: bash
-      run: ./data/create_branch_database.sh ServiceBuildUserDatabaseConnectionSettings ${{ steps.job-values.outputs.branch }} ${{ github.actor }}
+      run: ./data/create_branch_database.sh ServiceBuildUserDatabaseConnectionSettings ${{ steps.core-values.outputs.branch }} ${{ github.actor }}
     
     - name: Install EF Core CLI
       if: ${{ inputs.deploy-branch-database == 'true' }}
@@ -177,17 +181,17 @@ runs:
         DEPLOY_EMAIL: ${{ steps.set-pusher-email.outputs.pusher-email }}
         ASPNETCORE_ENVIRONMENT: ${{ inputs.service-type-environment }}
         USE_DEPLOY_CREDENTIALS: 'true'
-        BRANCH_NAME: ${{ steps.job-values.outputs.branch }}   
-        BRANCH_DATABASE: ${{ steps.job-values.outputs.branch }}
+        BRANCH_NAME: ${{ steps.core-values.outputs.branch }}   
+        BRANCH_DATABASE: ${{ steps.core-values.outputs.branch }}
       run: $HOME/.dotnet/tools/dotnet-ef database update -p ${{ inputs.database-project }} -s ${{ inputs.database-startup-project }} --context EfContext -v
 
     - name: Deploy CDK
       if: ${{ inputs.deploy-cdk == 'true' }}
       env:
-        AWS_ACCOUNT_ID: ${{ steps.job-values.outputs.aws-account-id }}
+        AWS_ACCOUNT_ID: ${{ steps.core-values.outputs.aws-account-id }}
         AWS_REGION: ${{ inputs.aws-region }}
-        BRANCH_NAME: ${{ steps.job-values.outputs.branch }}
-        BRANCH_DATABASE: ${{ steps.job-values.outputs.branch }}
+        BRANCH_NAME: ${{ steps.core-values.outputs.branch }}
+        BRANCH_DATABASE: ${{ steps.core-values.outputs.branch }}
       shell: bash
       run: |
         cd ${{ inputs.cdk-directory }}
@@ -197,9 +201,9 @@ runs:
       id: branch-values-file
       shell: bash
       run: |
-        if [ -f ${{ inputs.helm-values-file-directory }}/${{ steps.job-values.outputs.branch }}.${{ steps.helm-values-file-name }} ]; then
+        if [ -f ${{ inputs.helm-values-file-directory }}/${{ steps.core-values.outputs.branch }}.${{ steps.helm-values-file-name }} ]; then
           echo "Branch values file found"
-          echo "values-file=${{ inputs.helm-values-file-directory }}/${{ steps.helm-values-file-name }},${{ inputs.helm-values-file-directory }}/${{ steps.job-values.outputs.branch }}.${{ steps.helm-values-file-name }}" >> $GITHUB_OUTPUT;
+          echo "values-file=${{ inputs.helm-values-file-directory }}/${{ steps.helm-values-file-name }},${{ inputs.helm-values-file-directory }}/${{ steps.core-values.outputs.branch }}.${{ steps.helm-values-file-name }}" >> $GITHUB_OUTPUT;
         else
           echo "values-file=${{ inputs.helm-values-file-directory }}/${{ steps.helm-values-file-name }}" >> $GITHUB_OUTPUT;
         fi
