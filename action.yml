@@ -164,34 +164,6 @@ runs:
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ github.sha }}
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:latest
 
-    # - name: Create Branch Database
-    #   id: create-branch-database
-    #   if: ${{ inputs.deploy-branch-database == 'true' }}
-    #   shell: bash
-    #   run: ./data/create_branch_database.sh ServiceBuildUserDatabaseConnectionSettings ${{ steps.core-values.outputs.branch }} ${{ github.actor }}
-    
-    # - name: Install EF Core CLI
-    #   if: ${{ inputs.deploy-branch-database == 'true' }}
-    #   shell: bash
-    #   run: | 
-    #     if dotnet tool list -g | grep -q dotnet-ef; then
-    #       echo "EF Core CLI Already Installed"
-    #     else
-    #       dotnet tool install -g dotnet-ef --version ${{ inputs.database-dotnet-ef-tool-version }}
-    #       echo "EF Core CLI now installed."
-    #     fi
-
-    # - name: Update Database
-    #   if: ${{ inputs.deploy-branch-database == 'true' }}
-    #   shell: bash
-    #   env:
-    #     DEPLOY_EMAIL: ${{ steps.set-pusher-email.outputs.pusher-email }}
-    #     ASPNETCORE_ENVIRONMENT: ${{ inputs.service-type-environment }}
-    #     USE_DEPLOY_CREDENTIALS: 'true'
-    #     BRANCH_NAME: ${{ steps.core-values.outputs.branch }}   
-    #     BRANCH_DATABASE: ${{ steps.core-values.outputs.branch }}
-    #   run: $HOME/.dotnet/tools/dotnet-ef database update -p ${{ inputs.database-project }} -s ${{ inputs.database-startup-project }} --context EfContext -v
-
     - name: Deploy CDK
       if: ${{ inputs.deploy-cdk == 'true' }}
       env:
@@ -208,11 +180,11 @@ runs:
       id: branch-values-file
       shell: bash
       run: |
-        if [ -f ${{ inputs.helm-values-file-directory }}/${{ steps.core-values.outputs.branch }}.${{ steps.helm-values-file-name }} ]; then
+        if [ -f ${{ inputs.helm-values-file-directory }}/${{ steps.core-values.outputs.branch }}.${{ inputs.helm-values-file-name }} ]; then
           echo "Branch values file found"
-          echo "values-file=${{ inputs.helm-values-file-directory }}/${{ steps.helm-values-file-name }},${{ inputs.helm-values-file-directory }}/${{ steps.core-values.outputs.branch }}.${{ steps.helm-values-file-name }}" >> $GITHUB_OUTPUT;
+          echo "values-file=${{ inputs.helm-values-file-directory }}/${{ inputs.helm-values-file-name }},${{ inputs.helm-values-file-directory }}/${{ steps.core-values.outputs.branch }}.${{ inputs.helm-values-file-name }}" >> $GITHUB_OUTPUT;
         else
-          echo "values-file=${{ inputs.helm-values-file-directory }}/${{ steps.helm-values-file-name }}" >> $GITHUB_OUTPUT;
+          echo "values-file=${{ inputs.helm-values-file-directory }}/${{ inputs.helm-values-file-name }}" >> $GITHUB_OUTPUT;
         fi
 
     - name: Pull Helm Chart
@@ -227,8 +199,8 @@ runs:
     - name: Install/Upgrade Helm Chart
       id: helm-upgrade-action
       env:
-        ADDITIONAL_ARGS: ${{inputs.helm-additional-args }}
-        ADDITIONAL_VALUES: ${{inputs.helm-additional-values }}
+        ADDITIONAL_ARGS: ${{ inputs.helm-additional-args }}
+        ADDITIONAL_VALUES: ${{ inputs.helm-additional-values }}
         HELM_CHART: "${{ steps.pull-chart.outputs.chart-path }}"
         NAMESPACE: ${{ steps.job-values.outputs.helm-namespace }}
         PRINT_TEMPLATE: ${{ inputs.helm-print-template }}
