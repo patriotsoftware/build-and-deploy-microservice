@@ -26,19 +26,19 @@ inputs:
     description: 'Additional Docker build args to pass to the Docker Build custom action.'
     required: false
   # Branch Database Configuration
-  deploy-branch-database:
-    description: 'Deploy branch database. Default is "true"'
-    required: false
-    default: 'true'
-  database-project:
-    description: 'The database project (-p flag) for the database update step. Required if deploying the branch database.'
-    required: false
-  database-startup-project:
-    description: 'The database startup project (-s flag) for the database update step. Required if deploying the branch database.'
-    required: false
-  database-dotnet-ef-tool-version:
-    description: 'The EF Tools version to download for branch database deployments.'
-    required: false
+  # deploy-branch-database:
+  #   description: 'Deploy branch database. Default is "true"'
+  #   required: false
+  #   default: 'true'
+  # database-project:
+  #   description: 'The database project (-p flag) for the database update step. Required if deploying the branch database.'
+  #   required: false
+  # database-startup-project:
+  #   description: 'The database startup project (-s flag) for the database update step. Required if deploying the branch database.'
+  #   required: false
+  # database-dotnet-ef-tool-version:
+  #   description: 'The EF Tools version to download for branch database deployments.'
+  #   required: false
   # CDK Configuration
   deploy-cdk:
     description: 'Determine to deploy CDK or not. Default is "false".'
@@ -164,33 +164,33 @@ runs:
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ github.sha }}
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:latest
 
-    - name: Create Branch Database
-      id: create-branch-database
-      if: ${{ inputs.deploy-branch-database == 'true' }}
-      shell: bash
-      run: ./data/create_branch_database.sh ServiceBuildUserDatabaseConnectionSettings ${{ steps.core-values.outputs.branch }} ${{ github.actor }}
+    # - name: Create Branch Database
+    #   id: create-branch-database
+    #   if: ${{ inputs.deploy-branch-database == 'true' }}
+    #   shell: bash
+    #   run: ./data/create_branch_database.sh ServiceBuildUserDatabaseConnectionSettings ${{ steps.core-values.outputs.branch }} ${{ github.actor }}
     
-    - name: Install EF Core CLI
-      if: ${{ inputs.deploy-branch-database == 'true' }}
-      shell: bash
-      run: | 
-        if dotnet tool list -g | grep -q dotnet-ef; then
-          echo "EF Core CLI Already Installed"
-        else
-          dotnet tool install -g dotnet-ef --version ${{ inputs.database-dotnet-ef-tool-version }}
-          echo "EF Core CLI now installed."
-        fi
+    # - name: Install EF Core CLI
+    #   if: ${{ inputs.deploy-branch-database == 'true' }}
+    #   shell: bash
+    #   run: | 
+    #     if dotnet tool list -g | grep -q dotnet-ef; then
+    #       echo "EF Core CLI Already Installed"
+    #     else
+    #       dotnet tool install -g dotnet-ef --version ${{ inputs.database-dotnet-ef-tool-version }}
+    #       echo "EF Core CLI now installed."
+    #     fi
 
-    - name: Update Database
-      if: ${{ inputs.deploy-branch-database == 'true' }}
-      shell: bash
-      env:
-        DEPLOY_EMAIL: ${{ steps.set-pusher-email.outputs.pusher-email }}
-        ASPNETCORE_ENVIRONMENT: ${{ inputs.service-type-environment }}
-        USE_DEPLOY_CREDENTIALS: 'true'
-        BRANCH_NAME: ${{ steps.core-values.outputs.branch }}   
-        BRANCH_DATABASE: ${{ steps.core-values.outputs.branch }}
-      run: $HOME/.dotnet/tools/dotnet-ef database update -p ${{ inputs.database-project }} -s ${{ inputs.database-startup-project }} --context EfContext -v
+    # - name: Update Database
+    #   if: ${{ inputs.deploy-branch-database == 'true' }}
+    #   shell: bash
+    #   env:
+    #     DEPLOY_EMAIL: ${{ steps.set-pusher-email.outputs.pusher-email }}
+    #     ASPNETCORE_ENVIRONMENT: ${{ inputs.service-type-environment }}
+    #     USE_DEPLOY_CREDENTIALS: 'true'
+    #     BRANCH_NAME: ${{ steps.core-values.outputs.branch }}   
+    #     BRANCH_DATABASE: ${{ steps.core-values.outputs.branch }}
+    #   run: $HOME/.dotnet/tools/dotnet-ef database update -p ${{ inputs.database-project }} -s ${{ inputs.database-startup-project }} --context EfContext -v
 
     - name: Deploy CDK
       if: ${{ inputs.deploy-cdk == 'true' }}
