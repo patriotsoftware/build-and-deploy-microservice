@@ -205,7 +205,7 @@ runs:
         NAMESPACE: ${{ steps.job-values.outputs.helm-namespace }}
         PRINT_TEMPLATE: ${{ inputs.helm-print-template }}
         PROBLEMS_TIMEOUT: ${{ inputs.helm-problems-timeout }}
-        RELEASE_NAME: ${{ inputs.release-name }}
+        RELEASE_NAME: ${{ steps.job-values.outputs.release }}
         VALUES_FILE: ${{ steps.branch-values-file.outputs.values-file }}
       shell: bash
       run: ${{ github.action_path }}/helm-upgrade-action.sh
