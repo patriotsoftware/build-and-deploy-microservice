@@ -25,20 +25,6 @@ inputs:
   docker-build-args:
     description: 'Additional Docker build args to pass to the Docker Build custom action.'
     required: false
-  # Branch Database Configuration
-  # deploy-branch-database:
-  #   description: 'Deploy branch database. Default is "true"'
-  #   required: false
-  #   default: 'true'
-  # database-project:
-  #   description: 'The database project (-p flag) for the database update step. Required if deploying the branch database.'
-  #   required: false
-  # database-startup-project:
-  #   description: 'The database startup project (-s flag) for the database update step. Required if deploying the branch database.'
-  #   required: false
-  # database-dotnet-ef-tool-version:
-  #   description: 'The EF Tools version to download for branch database deployments.'
-  #   required: false
   # CDK Configuration
   deploy-cdk:
     description: 'Determine to deploy CDK or not. Default is "false".'
