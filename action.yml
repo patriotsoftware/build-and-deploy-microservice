@@ -25,6 +25,9 @@ inputs:
   docker-build-args:
     description: 'Additional Docker build args to pass to the Docker Build custom action.'
     required: false
+  docker-extra-tag:
+    description: 'Additional Docker tag to apply to the Docker image.'
+    required: false
   # CDK Configuration
   deploy-cdk:
     description: 'Determine to deploy CDK or not. Default is "false".'
@@ -149,6 +152,13 @@ runs:
         tags: |
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ github.sha }}
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:latest
+
+    - name: Deploy Additional Docker Tag
+      if: ${{ inputs.docker-extra-tag != '' }}
+      shell: bash
+      run: |
+        docker tag ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ inputs.docker-extra-tag }}
+        docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ inputs.docker-extra-tag }}
 
     - name: Deploy CDK
       if: ${{ inputs.deploy-cdk == 'true' }}
