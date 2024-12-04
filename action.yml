@@ -115,7 +115,7 @@ runs:
     
     - name: Create ECR Repository
       shell: bash
-      run: aws ecr create-repository --repository-name ${{ steps.job-values.outputs.ecr-repo }} || echo "Repository exists already. Skipping creation."
+      run: aws ecr create-repository --repository-name ${{ steps.job-values.outputs.ecr-repo }} --tags Key=repository,Value=${{ steps.job-values.outputs.ecr-repo }} || echo "Repository exists already. Skipping creation."
 
     - name: Set up Docker Buildx
       id: buildx
