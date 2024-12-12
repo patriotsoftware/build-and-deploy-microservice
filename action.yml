@@ -22,16 +22,11 @@ inputs:
     description: 'The Docker context to build the Dockerfile from. Default is "."'
     required: false
     default: '.'
-  # Branch Database Configuration
-  deploy-branch-database:
-    description: 'Deploy branch database. Default is "true"'
+  docker-build-args:
+    description: 'Additional Docker build args to pass to the Docker Build custom action.'
     required: false
-    default: 'true'
-  database-project:
-    description: 'The database project (-p flag) for the database update step. Required if deploying the branch database.'
-    required: false
-  database-startup-project:
-    description: 'The database startup project (-s flag) for the database update step. Required if deploying the branch database.'
+  docker-extra-tag:
+    description: 'Additional Docker tag to apply to the Docker image.'
     required: false
   # CDK Configuration
   deploy-cdk:
@@ -88,34 +83,23 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Set Job Values
-      id: job-values
+    - name: Extract Branch name and AWS Account ID
+      id: core-values
       shell: bash
       run: |
         export UNESCAPED_BRANCH_NAME=${GITHUB_REF#refs/heads/}
-
         echo "branch=$(echo ${UNESCAPED_BRANCH_NAME})" >> $GITHUB_OUTPUT
         echo "clean-branch=$(echo ${UNESCAPED_BRANCH_NAME} | sed 's/_//g' | tr '[:upper:]' '[:lower:]' | cut -c -38)" >> $GITHUB_OUTPUT
         echo "aws-account-id=$(aws sts get-caller-identity --query Account --output text)" >> $GITHUB_OUTPUT
 
-        if [[ "${{ inputs.helm-base-chart }}" == "monochart" ]]; then
-          echo "helm-chart=${{ steps.job-values.outputs.aws-account-id }}.dkr.ecr.us-east-1.amazonaws.com/monochart" >> $GITHUB_OUTPUT
-        else
-          echo "helm-chart=${{ inputs.helm-base-chart }}" >> $GITHUB_OUTPUT
-        fi
-
-        if [[ "${{ inputs.helm-namespace }}" == "" ]]; then
-          echo "helm-namespace=${{ inputs.release-name }}" >> $GITHUB_OUTPUT
-        else
-          echo "helm-namespace=${{ inputs.helm-namespace }}" >> $GITHUB_OUTPUT
-        fi
-
-        if [[ "${{ steps.job-values.outputs.branch }}" =~ (main|master) ]]; then
-          echo "release=${{ inputs.release-name }}" >> $GITHUB_OUTPUT
+    - name: Set Job Values
+      id: job-values
+      shell: bash
+      run: |
+        if [[ "${{ steps.core-values.outputs.branch }}" =~ (main|master) ]]; then
           echo "ecr-repo=${{ inputs.release-name }}" >> $GITHUB_OUTPUT
         else
-          echo "release=$(echo ${{ inputs.release-name }}-${{ steps.job-values.outputs.clean-branch }})" >> $GITHUB_OUTPUT
-          echo "ecr-repo=$(echo ${{ inputs.release-name }}/${{ steps.job-values.outputs.clean-branch }})" >> $GITHUB_OUTPUT
+          echo "ecr-repo=$(echo ${{ inputs.release-name }}/${{ steps.core-values.outputs.clean-branch }})" >> $GITHUB_OUTPUT
         fi
 
     - name: Authenticate with AWS
@@ -131,98 +115,52 @@ runs:
     
     - name: Create ECR Repository
       shell: bash
-      run: aws ecr create-repository --repository-name ${{ steps.job-values.outputs.ecr-repo }} || echo "Repository exists already. Skipping creation."
+      run: aws ecr create-repository --repository-name ${{ steps.job-values.outputs.ecr-repo }} --tags Key=repository,Value=${{ steps.job-values.outputs.ecr-repo }} || echo "Repository exists already. Skipping creation."
 
     - name: Set up Docker Buildx
       id: buildx
+      uses: docker/setup-buildx-action@v3
       with:
         driver: docker
-      uses: docker/setup-buildx-action@v3
 
     - name: Copy NuGet Config
       shell: bash
       run: cp /home/runner/.nuget/NuGet/NuGet.Config ./nuget.config
 
-    - name: Build and Push
+    - name: Build and Push Docker Image
       uses: docker/build-push-action@v5
       with:
         file: ${{ inputs.dockerfile-path }}
         context: ${{ inputs.docker-context }}
         push: true
+        build-args: ${{ inputs.docker-build-args }}
         tags: |
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ github.sha }}
           ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:latest
 
-    - name: Create Branch Database
-      id: create-branch-database
-      if: ${{ inputs.deploy-branch-database == 'true' }}
-      shell: bash
-      run: ./data/create_branch_database.sh ServiceBuildUserDatabaseConnectionSettings ${{ steps.job-values.outputs.branch }} ${{ github.actor }}
-    
-    - name: Install EF Core CLI
-      if: ${{ inputs.deploy-branch-database == 'true' }}
-      shell: bash
-      run: | 
-        if dotnet tool list -g | grep -q dotnet-ef; then
-          echo "EF Core CLI Already Installed"
-        else
-          dotnet tool install -g dotnet-ef --version ${{ inputs.dotnet-ef-tool-version }}
-          echo "EF Core CLI now installed."
-        fi
-
-    - name: Update Database
-      if: ${{ inputs.deploy-branch-database == 'true' }}
-      shell: bash
-      env:
-        DEPLOY_EMAIL: ${{ steps.set-pusher-email.outputs.pusher-email }}
-        ASPNETCORE_ENVIRONMENT: ${{ inputs.service-type-environment }}
-        USE_DEPLOY_CREDENTIALS: 'true'
-        BRANCH_NAME: ${{ steps.job-values.outputs.branch }}   
-        BRANCH_DATABASE: ${{ steps.job-values.outputs.branch }}
-      run: $HOME/.dotnet/tools/dotnet-ef database update -p ${{ inputs.database-project }} -s ${{ inputs.database-startup-project }} --context EfContext -v
-
-    - name: Deploy CDK
-      if: ${{ inputs.deploy-cdk == 'true' }}
-      env:
-        AWS_ACCOUNT_ID: ${{ steps.job-values.outputs.aws-account-id }}
-        AWS_REGION: ${{ inputs.aws-region }}
-        BRANCH_NAME: ${{ steps.job-values.outputs.branch }}
-        BRANCH_DATABASE: ${{ steps.job-values.outputs.branch }}
+    - name: Deploy Additional Docker Tag
+      if: ${{ inputs.docker-extra-tag != '' }}
       shell: bash
       run: |
-        cd ${{ inputs.cdk-directory }}
-        cdk deploy --require-approval never
+        docker tag ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ inputs.docker-extra-tag }}
+        docker push ${{ steps.login-ecr.outputs.registry }}/${{ steps.job-values.outputs.ecr-repo }}:${{ inputs.docker-extra-tag }}
 
-    - name: Check For Branch Values File
-      id: branch-values-file
-      shell: bash
-      run: |
-        if [ -f ${{ inputs.helm-values-file-directory }}/${{ steps.job-values.outputs.branch }}.${{ steps.helm-values-file-name }} ]; then
-          echo "Branch values file found"
-          echo "values-file=${{ inputs.helm-values-file-directory }}/${{ steps.helm-values-file-name }},${{ inputs.helm-values-file-directory }}/${{ steps.job-values.outputs.branch }}.${{ steps.helm-values-file-name }}" >> $GITHUB_OUTPUT;
-        else
-          echo "values-file=${{ inputs.helm-values-file-directory }}/${{ steps.helm-values-file-name }}" >> $GITHUB_OUTPUT;
-        fi
-
-    - name: Pull Helm Chart
-      id: pull-chart
-      env:
-        BASE_CHART: ${{ steps.job-values.outputs.helm-chart }}
-        CHART_VERSION: ${{ inputs.helm-chart-version }}
-        TARGET_DIRECTORY: ${{ inputs.helm-target-directory }}
-      shell: bash
-      run: ${{ github.action_path }}/helm-chart-pull-action.sh
-
-    - name: Install/Upgrade Helm Chart
-      id: helm-upgrade-action
-      env:
-        ADDITIONAL_ARGS: ${{inputs.helm-additional-args }}
-        ADDITIONAL_VALUES: ${{inputs.helm-additional-values }}
-        HELM_CHART: "${{ steps.pull-chart.outputs.chart-path }}"
-        NAMESPACE: ${{ steps.job-values.outputs.helm-namespace }}
-        PRINT_TEMPLATE: ${{ inputs.helm-print-template }}
-        PROBLEMS_TIMEOUT: ${{ inputs.helm-problems-timeout }}
-        RELEASE_NAME: ${{ inputs.release-name }}
-        VALUES_FILE: ${{ steps.branch-values-file.outputs.values-file }}
-      shell: bash
-      run: ${{ github.action_path }}/helm-upgrade-action.sh
+    - name: Helm Install/Upgrade
+      uses: patriotsoftware/helm-deployment@v1
+      with:
+        aws-access-key-id: ${{ inputs.aws-access-key-id }}
+        aws-secret-access-key: ${{ inputs.aws-secret-access-key }}
+        aws-region: ${{ inputs.aws-region }}
+        deploy-cdk: ${{ inputs.deploy-cdk }}
+        cdk-directory: ${{ inputs.cdk-directory }}
+        release-name: ${{ inputs.release-name }}
+        helm-base-chart: ${{ inputs.helm-base-chart }}
+        helm-target-directory: ${{ inputs.helm-target-directory }}
+        helm-chart-version: ${{ inputs.helm-chart-version }}
+        helm-namespace: ${{ inputs.helm-namespace }}
+        helm-values-file-directory: ${{ inputs.helm-values-file-directory }}
+        helm-values-file-name: ${{ inputs.helm-values-file-name }}
+        helm-additional-values: ${{ inputs.helm-additional-values }}
+        helm-additional-args: ${{ inputs.helm-additional-args }}
+        helm-problems-timeout: ${{ inputs.helm-problems-timeout }}
+        helm-print-template: ${{ inputs.helm-print-template }}
